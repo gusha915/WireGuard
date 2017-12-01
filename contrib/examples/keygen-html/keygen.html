@@ -1,0 +1,71 @@
+<script src="curve25519_generate.js"></script>
+<script>
+// License: GPLv2
+function wireguard_keypair()
+{
+	var private = Module._malloc(32);
+	var public = Module._malloc(32);
+	Module._curve25519_generate_private(private);
+	Module._curve25519_generate_public(public, private);
+	var private_base64 = Module._malloc(45);
+	var public_base64 = Module._malloc(45);
+	Module._key_to_base64(private_base64, private);
+	Module._key_to_base64(public_base64, public);
+	Module._free(private);
+	Module._free(public);
+	var keypair = {
+		publicKey: Pointer_stringify(public_base64),
+		privateKey: Pointer_stringify(private_base64)
+	};
+	Module._free(private_base64);
+	Module._free(public_base64);
+	return keypair;
+}
+
+function send_pubkey_to_server(pubkey, username, password)
+{
+	alert("Sending " + username + ":" + password + " to server for new pubkey " + pubkey + "...");
+
+	// send info to server
+
+	var server_response = {
+		publicKey: "6spHEFoJrp9pijbxjJoS6fHjZaAWQqtdFFO/OtpVe3w=",
+		allowedIPs: [ "0.0.0.0/0", "::/0" ],
+		endpoint: "demo.wireguard.com:63321",
+		address: [ "192.168.18.42/32", "fd08:1234:1111::77/128" ],
+		dns: [ "8.8.8.8", "8.8.4.4" ]
+	}
+
+	return server_response;
+}
+
+function generate_new_config()
+{
+	var keypair = wireguard_keypair();
+	var server_response = send_pubkey_to_server(keypair.publicKey, "zx2c4", "supersecretpassword");
+
+	var config = [];
+	config.push("[Interface]");
+	config.push("PrivateKey = " + keypair.privateKey);
+	config.push("Address = " + server_response.address.join(", "));
+	config.push("DNS = " + server_response.dns.join(", "));
+	config.push("");
+	config.push("[Peer]");
+	config.push("PublicKey = " + server_response.publicKey);
+	config.push("AllowedIPs = " + server_response.allowedIPs.join(", "));
+	config.push("Endpoint = " + server_response.endpoint);
+	config.push("");
+	config = config.join("\n");
+
+	var blob = new Blob([config], { type: "text/plain" });
+	var a = document.createElement("a");
+	a.download = "demo0.conf";
+	a.href = URL.createObjectURL(blob);
+	a.style.display = "none";
+	document.body.appendChild(a);
+	a.click();
+	document.body.removeChild(a);
+}
+</script>
+
+<a href="javascript:generate_new_config()">Download a WireGuard configuration file</a>
